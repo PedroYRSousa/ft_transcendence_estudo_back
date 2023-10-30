@@ -9,6 +9,13 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
+const connections = new Map<string, Socket>();
+
+interface Payload {
+  name: string;
+  text: string;
+}
+
 @WebSocketGateway(3334, {
   cors: { origin: '*' },
   transports: ['websocket', 'polling'],
@@ -16,23 +23,16 @@ import { Server, Socket } from 'socket.io';
 export class AppGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
-  //@SubscribeMessage('msgToServer')
-  //handleMessage(client: unknown, payload: unknown): string {
-  //  console.dir(client);
-  //  console.dir(payload);
-  //  return 'Hello world!';
-  //}
-
   @WebSocketServer()
   server: Server;
 
   private logger: Logger = new Logger('AppGateway');
 
   @SubscribeMessage('msgToServer')
-  handleMessage(client: Socket, payload: string): void {
-    console.dir(client);
-    console.dir(payload);
-    this.server.emit('msgToClient', payload, client.id);
+  handleMessage(client: Socket, payload: Payload): void {
+    this.logger.log(`Client ${client.id} enviou dados ${payload.text}`);
+
+    this.broadcast(null, payload);
   }
 
   afterInit() {
@@ -40,12 +40,35 @@ export class AppGateway
   }
 
   handleConnection(client: Socket) {
-    console.dir(client);
     this.logger.log(`Client connect ${client.id}`);
+
+    connections.set(client.id, client);
+    this.broadcast(client, {
+      name: 'System',
+      text: `${client.id} entrou no chat`,
+    });
   }
 
   handleDisconnect(client: Socket) {
-    console.dir(client);
     this.logger.log(`Client disconnect ${client.id}`);
+
+    connections.delete(client.id);
+    this.broadcast(client, {
+      name: 'System',
+      text: `${client.id} saiu no chat`,
+    });
+  }
+
+  sendMessage(client: Socket, payload: Payload) {
+    this.logger.log(`Enviando dados ${payload.text} para ${client.id}`);
+    client.emit('msgToClient', payload, client.id);
+  }
+
+  broadcast(clientOwner: Socket | null, payload: Payload) {
+    connections.forEach((client, refer) => {
+      if (clientOwner && clientOwner.id == refer) return;
+
+      this.sendMessage(client, payload);
+    });
   }
 }
