@@ -16,17 +16,17 @@ interface Payload {
   text: string;
 }
 
-@WebSocketGateway(3334, {
+@WebSocketGateway(3335, {
   cors: { origin: '*' },
   transports: ['websocket', 'polling'],
 })
-export class AppGateway
+export class App2Gateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
   server: Server;
 
-  private logger: Logger = new Logger('Chat');
+  private logger: Logger = new Logger('Game');
 
   @SubscribeMessage('msgToServer')
   handleMessage(client: Socket, payload: Payload): void {
